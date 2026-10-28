@@ -6,3 +6,6 @@ models/embeddinggemma-2-full/
 models/**/.cache/
 .DS_Store
 .claude/
+# Rebuilt locally from models/embeddinggemma-2/weights/ (see rag/model_files.py)
+models/embeddinggemma-2/model.onnx.data
+models/embeddinggemma-2/model.onnx.data.tmp

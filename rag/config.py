@@ -6,12 +6,11 @@ from pathlib import Path
 REPO_DIR = Path(__file__).resolve().parent.parent
 
 MODEL_DIR = Path(os.environ.get("RAG_MODEL_DIR", REPO_DIR / "models" / "embeddinggemma-2"))
-MODEL_HUB_ID = "google/embeddinggemma-2"
 INDEX_DIR = Path(os.environ.get("RAG_INDEX_DIR", REPO_DIR / ".rag_index"))
 
 # Matryoshka dimension: 768 (full), 512, 256 or 128. Must match the index.
 EMBED_DIM = int(os.environ.get("RAG_DIM", "768"))
-DEVICE = os.environ.get("RAG_DEVICE")  # None = auto (mps > cuda > cpu)
+THREADS = int(os.environ.get("RAG_THREADS", "0"))  # 0 = let ONNX Runtime decide
 BATCH_SIZE = int(os.environ.get("RAG_BATCH_SIZE", "16"))
 MAX_SEQ_LEN = int(os.environ.get("RAG_MAX_SEQ_LEN", "1024"))
 

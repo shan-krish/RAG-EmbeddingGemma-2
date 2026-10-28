@@ -1,0 +1,8 @@
+3d691808629a3f6e0d189aaffd79c47339b099419af74dcc339412bac2fcd9f4  weights/model.onnx.data.bf16.part-00
+1be78cda9383796e66786be861716e18457a7691eea4426f293d2cfb08c0d316  weights/model.onnx.data.bf16.part-01
+4f2f862efc44c0fc3c306bdf4776c9245cfcf4624ce471fbd45bb5a0584690c9  weights/model.onnx.data.bf16.part-02
+84b728a7baf2f054897fe12ae94536f4caffc09b3b8fe63512cef01464b410ea  weights/model.onnx.data.bf16.part-03
+5874d2c2acfdd7c76e7f9d30a1d2854359cdca7dca8315346f0ad64f8262c181  weights/model.onnx.data.bf16.part-04
+1fcd6106ae70eb68fb88b76748ad0ce4ffac1db85754f4db2fc9a89b454a1f12  weights/model.onnx.data.bf16.part-05
+d22d61f305f781632415ed50e7af7d79d1a02cba90570f110987180aa7e12b25  weights/fixups.npz
+62d80161d4115dd3046f3f11ef342720c797305f8005a35725fe9f01ac3105e5  model.onnx.data

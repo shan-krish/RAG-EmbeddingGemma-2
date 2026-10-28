@@ -1,0 +1,11 @@
+# Only needed to regenerate the bundled model with scripts/export_model.py (Python 3.11+).
+# Not needed to use the RAG.
+torch>=2.9
+transformers>=5.21
+sentence-transformers>=6.2
+onnx>=1.19
+onnxscript>=0.5
+huggingface_hub
+pillow
+torchvision
+numpy

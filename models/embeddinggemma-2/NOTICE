@@ -1,6 +1,7 @@
 This directory contains a modified copy of google/embeddinggemma-2
 (https://huggingface.co/google/embeddinggemma-2), licensed under the Apache License 2.0.
 
-Changes: exported with sentence-transformers as a text-only model (vision and audio encoders
-removed via vision_config=None, audio_config=None) and weights cast to bfloat16.
-README.md is the original model card.
+Changes: text-only (vision and audio encoders removed), exported to ONNX with mean pooling and
+L2 normalisation built in. The fp32 weights are stored as their upper 16 bits (bf16, which is
+the precision Google released) plus a small fix-up table, split into < 100 MB parts; they are
+rebuilt bit-exactly on first run. See scripts/export_model.py. README.md is the original model card.

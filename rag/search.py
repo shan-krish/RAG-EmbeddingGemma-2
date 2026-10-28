@@ -7,8 +7,10 @@ import re
 import threading
 from pathlib import Path
 
+import math
+from collections import Counter
+
 import numpy as np
-from rank_bm25 import BM25Okapi
 
 from . import config
 from .embedder import embed_query
@@ -34,6 +36,32 @@ def tokenize(text: str) -> list[str]:
         if len(parts) > 1:
             out.extend(p.lower() for p in parts if p)
     return out
+
+
+class BM25Okapi:
+    """Okapi BM25 (k1=1.5, b=0.75), with a floor on negative IDF for very common terms."""
+
+    def __init__(self, corpus: list[list[str]], k1: float = 1.5, b: float = 0.75, epsilon: float = 0.25):
+        self.k1, self.b = k1, b
+        self.tfs = [Counter(doc) for doc in corpus]
+        self.lens = np.array([len(doc) for doc in corpus], dtype=np.float32)
+        self.avgdl = float(self.lens.mean()) if len(corpus) else 0.0
+        df = Counter(t for tf in self.tfs for t in tf)
+        n = len(corpus)
+        self.idf = {t: math.log(n - f + 0.5) - math.log(f + 0.5) for t, f in df.items()}
+        floor = epsilon * (sum(self.idf.values()) / len(self.idf)) if self.idf else 0.0
+        self.idf = {t: (v if v >= 0 else floor) for t, v in self.idf.items()}
+
+    def get_scores(self, query: list[str]) -> np.ndarray:
+        scores = np.zeros(len(self.tfs), dtype=np.float32)
+        norm = self.k1 * (1 - self.b + self.b * self.lens / max(self.avgdl, 1e-9))
+        for t in set(query):
+            idf = self.idf.get(t)
+            if idf is None:
+                continue
+            f = np.array([tf.get(t, 0) for tf in self.tfs], dtype=np.float32)
+            scores += idf * f * (self.k1 + 1) / (f + norm)
+        return scores
 
 
 class Searcher:
@@ -107,7 +135,10 @@ class Searcher:
                 if not mask.any():
                     return []
 
-            cos = self.matrix @ embed_query(query)
+            q = embed_query(query)
+            # numpy 2.0.x on macOS Accelerate raises spurious FP warnings here; values are exact and finite.
+            with np.errstate(all="ignore"):
+                cos = self.matrix @ q
             cos[~mask] = -1.0
             dense_rank = np.argsort(-cos)[:CANDIDATES]
 

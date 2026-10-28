@@ -1,4 +1,8 @@
-"""EmbeddingGemma 2 wrapper: text-only loading, task prefixes, Matryoshka truncation."""
+"""EmbeddingGemma 2 via ONNX Runtime: task prefixes, batching, Matryoshka truncation.
+
+Runtime needs only onnxruntime, tokenizers and numpy (works on Python 3.9+); mean pooling and
+L2 normalisation are part of the exported graph (see scripts/export_model.py).
+"""
 
 from __future__ import annotations
 
@@ -8,52 +12,34 @@ import threading
 import numpy as np
 
 from . import config
+from .model_files import ensure_model
 
 QUERY_PREFIX = "task: search result | query: "
-_model = None
+PAD_ID = 0
+_session = None
+_tokenizer = None
 _lock = threading.Lock()
 
 
-def _pick_device() -> str:
-    if config.DEVICE:
-        return config.DEVICE
-    import torch
-
-    if torch.backends.mps.is_available():
-        return "mps"
-    if torch.cuda.is_available():
-        return "cuda"
-    return "cpu"
-
-
-def _local_model_ok() -> bool:
-    weights = config.MODEL_DIR / "model.safetensors"
-    # A git-lfs pointer file is ~130 bytes; the real weights are ~540 MB.
-    return weights.exists() and weights.stat().st_size > 1_000_000
-
-
 def get_model():
-    global _model
+    """Load (once) and return (onnxruntime session, tokenizer)."""
+    global _session, _tokenizer
     with _lock:
-        if _model is None:
-            import torch
-            from sentence_transformers import SentenceTransformer
+        if _session is None:
+            import onnxruntime as ort
+            from tokenizers import Tokenizer
 
-            if _local_model_ok():
-                source = str(config.MODEL_DIR)
-            else:
-                print(f"[rag] local model missing at {config.MODEL_DIR}; using {config.MODEL_HUB_ID} from Hugging Face",
-                      file=sys.stderr)
-                source = config.MODEL_HUB_ID
-            _model = SentenceTransformer(
-                source,
-                device=_pick_device(),
-                # Text-only: skip the vision/audio encoders (740M -> 270M params).
-                config_kwargs={"vision_config": None, "audio_config": None},
-                model_kwargs={"dtype": torch.float32},
-            )
-            _model.max_seq_length = config.MAX_SEQ_LEN
-        return _model
+            graph = ensure_model()  # rebuilds the committed weight parts on first run; never downloads
+            opts = ort.SessionOptions()
+            opts.log_severity_level = 3
+            if config.THREADS:
+                opts.intra_op_num_threads = config.THREADS
+            _session = ort.InferenceSession(str(graph), sess_options=opts, providers=["CPUExecutionProvider"])
+            tok = Tokenizer.from_file(str(config.MODEL_DIR / "tokenizer.json"))
+            tok.no_padding()
+            tok.enable_truncation(max_length=config.MAX_SEQ_LEN)
+            _tokenizer = tok
+        return _session, _tokenizer
 
 
 def format_document(title: str, breadcrumb: str, text: str) -> str:
@@ -61,17 +47,31 @@ def format_document(title: str, breadcrumb: str, text: str) -> str:
     return f"title: {full_title} | text: {text}"
 
 
+def _normalize(x: np.ndarray) -> np.ndarray:
+    return x / np.maximum(np.linalg.norm(x, axis=1, keepdims=True), 1e-12)
+
+
 def _encode(texts: list[str], show_progress: bool = False) -> np.ndarray:
-    model = get_model()
-    emb = model.encode(
-        texts,
-        batch_size=config.BATCH_SIZE,
-        truncate_dim=config.EMBED_DIM,
-        normalize_embeddings=True,  # re-normalises after Matryoshka truncation
-        convert_to_numpy=True,
-        show_progress_bar=show_progress,
-    )
-    return emb.astype(np.float32)
+    session, tok = get_model()
+    ids = [e.ids for e in tok.encode_batch(texts)]
+    out = np.zeros((len(texts), 768), dtype=np.float32)
+    order = sorted(range(len(ids)), key=lambda i: len(ids[i]))  # similar lengths -> less padding
+    for start in range(0, len(order), config.BATCH_SIZE):
+        batch = order[start:start + config.BATCH_SIZE]
+        width = max(len(ids[i]) for i in batch)
+        input_ids = np.full((len(batch), width), PAD_ID, dtype=np.int64)
+        mask = np.zeros((len(batch), width), dtype=np.int64)
+        for row, i in enumerate(batch):
+            input_ids[row, :len(ids[i])] = ids[i]
+            mask[row, :len(ids[i])] = 1
+        out[batch] = session.run(None, {"input_ids": input_ids, "attention_mask": mask})[0]
+        if show_progress:
+            print(f"\r[rag] embedded {min(start + config.BATCH_SIZE, len(order))}/{len(order)}", end="",
+                  file=sys.stderr)
+    if show_progress:
+        print(file=sys.stderr)
+    # Matryoshka: keep the leading dims, then re-normalise.
+    return _normalize(out[:, :config.EMBED_DIM]).astype(np.float32)
 
 
 def embed_documents(docs: list[str], show_progress: bool = False) -> np.ndarray:

@@ -82,16 +82,16 @@ def cmd_files(a) -> None:
 
 
 def cmd_ui(a) -> None:
-    import uvicorn
+    from .web.app import serve
 
     url = f"http://{a.host}:{a.port}"
-    print(f"[rag] UI on {url}", file=sys.stderr)
+    print(f"[rag] UI on {url}  (Ctrl-C to stop)", file=sys.stderr)
     if not a.no_open:
         import threading
         import webbrowser
 
-        threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run("rag.web.app:app", host=a.host, port=a.port, log_level="warning")
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+    serve(a.host, a.port)
 
 
 def cmd_mcp(a) -> None:
@@ -101,15 +101,38 @@ def cmd_mcp(a) -> None:
 
 
 def cmd_watch(a) -> None:
-    from watchfiles import watch
+    import time
 
-    from .index import index_paths, status
+    from .index import get_meta, connect, index_paths, iter_files, status
 
     index_paths(a.paths or None)
     targets = status()["sources"]
-    print(f"[rag] watching {', '.join(targets)} (Ctrl-C to stop)", file=sys.stderr)
-    for _ in watch(*targets):
-        index_paths(None)
+    con = connect()
+    exts = set(get_meta(con, "exts", sorted(config.DEFAULT_EXTS)))
+    con.close()
+
+    def snapshot() -> dict:
+        snap = {}
+        for t in targets:
+            for f in iter_files(Path(t), exts):
+                try:
+                    st = f.stat()
+                    snap[str(f)] = (st.st_mtime_ns, st.st_size)
+                except OSError:
+                    pass
+        return snap
+
+    print(f"[rag] watching {', '.join(targets)} every {a.interval}s (Ctrl-C to stop)", file=sys.stderr)
+    last = snapshot()
+    try:
+        while True:
+            time.sleep(a.interval)
+            now = snapshot()
+            if now != last:
+                index_paths(None)
+                last = now
+    except KeyboardInterrupt:
+        pass
 
 
 def cmd_vscode(a) -> None:
@@ -157,6 +180,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     w = sub.add_parser("watch", help="re-index automatically when files change")
     w.add_argument("paths", nargs="*")
+    w.add_argument("--interval", type=float, default=2.0, help="seconds between checks (default 2)")
     w.set_defaults(fn=cmd_watch)
 
     v = sub.add_parser("vscode", help="wire this RAG into a VS Code project for Copilot")
