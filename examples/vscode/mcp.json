@@ -1,0 +1,13 @@
+{
+  "servers": {
+    "docs-rag": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/RAG-EmbeddingGemma-2/rag.sh",
+      "args": [
+        "--index-dir", "${workspaceFolder}/.rag_index",
+        "mcp",
+        "--source", "${workspaceFolder}/docs"
+      ]
+    }
+  }
+}

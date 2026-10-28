@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docs Retrieval</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f7f5; --surface: #ffffff; --surface-2: #f1f1ee; --border: #e4e4df;
+  --text: #1c1c1a; --muted: #6b6b66; --faint: #9a9a94;
+  --accent: #3b5bdb; --accent-soft: #e8edff; --mark: #fff1b8; --mark-text: #3d3200;
+  --good: #2f9e44; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121212; --surface: #1a1a1a; --surface-2: #222220; --border: #2c2c2a;
+  --text: #ececea; --muted: #a0a09a; --faint: #6e6e69;
+  --accent: #91a7ff; --accent-soft: #1f2640; --mark: #4a3f10; --mark-text: #ffe9a3;
+  --good: #69db7c; --shadow: none;
+}}
+:root[data-theme="dark"] {
+  --bg: #121212; --surface: #1a1a1a; --surface-2: #222220; --border: #2c2c2a;
+  --text: #ececea; --muted: #a0a09a; --faint: #6e6e69;
+  --accent: #91a7ff; --accent-soft: #1f2640; --mark: #4a3f10; --mark-text: #ffe9a3;
+  --good: #69db7c; --shadow: none;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 var(--sans); }
+button { font: inherit; color: inherit; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 16px 80px; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 22px 0 6px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -.01em; }
+.logo { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, var(--accent), #9c36b5); display: grid; place-items: center; color: #fff; font-size: 14px; }
+.brand small { color: var(--faint); font-weight: 500; }
+.stats { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+.pill { border: 1px solid var(--border); background: var(--surface); padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.icon-btn { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 4px 9px; cursor: pointer; color: var(--muted); }
+.icon-btn:hover { color: var(--text); }
+
+.hero { padding: 40px 0 18px; transition: padding .25s ease; }
+.hero.compact { padding: 14px 0 10px; }
+.hero h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -.025em; font-weight: 700; }
+.hero p { margin: 0 0 22px; color: var(--muted); }
+.hero.compact h1, .hero.compact p { display: none; }
+
+form.search { position: relative; }
+.search input { width: 100%; padding: 15px 120px 15px 46px; font: 16px var(--sans); color: var(--text);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; outline: none; box-shadow: var(--shadow); }
+.search input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.search .glass { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--faint); }
+.search kbd { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font: 12px var(--mono); color: var(--faint);
+  border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; background: var(--surface-2); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; color: var(--muted); font-size: 13px; }
+.controls select, .controls label { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 9px; color: var(--text); font: 13px var(--sans); }
+.controls label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.controls .spacer { flex: 1; }
+.btn { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 11px; cursor: pointer; font-size: 13px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); color: #fff; }
+
+.meta { margin: 18px 2px 10px; color: var(--muted); font-size: 13px; min-height: 20px; }
+.results { display: grid; gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px 12px; box-shadow: var(--shadow);
+  animation: rise .25s ease both; }
+@keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.card-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.rank { font: 600 12px var(--mono); color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 7px; }
+.loc { font: 500 13px var(--mono); color: var(--text); word-break: break-all; }
+.loc span { color: var(--faint); }
+.score { margin-left: auto; display: flex; align-items: center; gap: 8px; font: 12px var(--mono); color: var(--muted); }
+.bar { width: 64px; height: 5px; border-radius: 9px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--good)); border-radius: 9px; }
+.tag { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px; }
+.crumb { margin: 3px 0 8px; color: var(--muted); font-size: 13px; }
+.crumb b { color: var(--text); font-weight: 600; }
+.body { font-size: 14.5px; overflow-wrap: anywhere; }
+.body.clamp { max-height: 15.5em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 70%, transparent); mask-image: linear-gradient(#000 70%, transparent); }
+.body p { margin: 0 0 .55em; }
+.body h4 { margin: .2em 0 .35em; font-size: 14.5px; }
+.body code { font: 12.5px var(--mono); background: var(--surface-2); border-radius: 5px; padding: 1px 5px; }
+.body pre { background: var(--surface-2); border-radius: 9px; padding: 10px 12px; overflow-x: auto; margin: .4em 0 .7em; }
+.body pre code { background: none; padding: 0; }
+.body mark { background: var(--mark); color: var(--mark-text); border-radius: 3px; padding: 0 1px; }
+.card-foot { display: flex; gap: 6px; margin-top: 8px; }
+.link { border: none; background: none; color: var(--muted); font-size: 12.5px; cursor: pointer; padding: 3px 6px; border-radius: 6px; }
+.link:hover { color: var(--accent); background: var(--accent-soft); }
+
+.empty { text-align: center; padding: 50px 10px; color: var(--muted); }
+.empty .big { font-size: 34px; margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: 13px; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,.28); opacity: 0; pointer-events: none; transition: opacity .2s; }
+.drawer-bg.open { opacity: 1; pointer-events: auto; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 100%); background: var(--surface); border-left: 1px solid var(--border);
+  transform: translateX(100%); transition: transform .25s ease; display: flex; flex-direction: column; z-index: 2; }
+.drawer.open { transform: none; }
+.drawer-head { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.drawer-head .loc { flex: 1; }
+.code { flex: 1; overflow: auto; font: 12.5px/1.65 var(--mono); padding: 10px 0; }
+.ln { display: flex; padding: 0 18px; white-space: pre-wrap; word-break: break-word; }
+.ln.hit { background: var(--accent-soft); }
+.ln b { width: 44px; flex: none; color: var(--faint); font-weight: 400; user-select: none; text-align: right; padding-right: 14px; }
+
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--text); color: var(--bg);
+  padding: 8px 14px; border-radius: 9px; font-size: 13px; transition: all .2s; pointer-events: none; z-index: 3; }
+.toast.show { opacity: 1; transform: translateX(-50%); }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: s .7s linear infinite; vertical-align: -2px; }
+@keyframes s { to { transform: rotate(360deg); } }
+
+@media (max-width: 600px) {
+  .hero h1 { font-size: 24px; }
+  .search input { padding-right: 16px; }
+  .search kbd, .stats .pill.hide-sm, .brand small { display: none; }
+  .card-foot { flex-wrap: wrap; }
+  .link { white-space: nowrap; }
+  .score { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="logo">◆</div>Docs Retrieval <small>EmbeddingGemma 2</small></div>
+    <div class="stats">
+      <span class="pill" id="stat-files">…</span>
+      <span class="pill hide-sm" id="stat-chunks"></span>
+      <button class="icon-btn" id="reindex" title="Re-index sources">↻</button>
+      <button class="icon-btn" id="theme" title="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <section class="hero" id="hero">
+    <h1>Ask your docs.</h1>
+    <p>Semantic + keyword search over your local files. Only the chunks that matter.</p>
+    <form class="search" id="form" autocomplete="off">
+      <svg class="glass" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" placeholder="e.g. how do I roll back a deploy?" autofocus>
+      <kbd>/</kbd>
+    </form>
+    <div class="controls">
+      <select id="scope" title="Limit to a file"><option value="">All files</option></select>
+      <select id="k" title="Max results">
+        <option value="3">Top 3</option><option value="5">Top 5</option><option value="8" selected>Top 8</option><option value="15">Top 15</option>
+      </select>
+      <label title="Also show hits that score well below the best one"><input type="checkbox" id="all"> weaker matches</label>
+      <span class="spacer"></span>
+      <button class="btn primary" id="copy-all" hidden>Copy as context</button>
+    </div>
+  </section>
+
+  <div class="meta" id="meta"></div>
+  <div class="results" id="results"></div>
+</div>
+
+<div class="drawer-bg" id="drawer-bg"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head">
+    <div class="loc" id="drawer-title"></div>
+    <button class="btn" id="drawer-copy">Copy path</button>
+    <button class="icon-btn" id="drawer-close">✕</button>
+  </div>
+  <div class="code" id="drawer-code"></div>
+</aside>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STOP = new Set("a an and are as at be but by can do does for from has have how i if in into is it its me my no not of on or our so than that the their then there these this to us was we what when where which who why will with you your".split(" "));
+let last = { results: [], markdown: "" };
+
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const terms = (q) => [...new Set((q.toLowerCase().match(/[a-z0-9_.\-]+/g) || []).filter((t) => t.length > 2 && !STOP.has(t)))];
+
+function highlight(html, ts) {
+  if (!ts.length) return html;
+  const re = new RegExp("\\b(" + ts.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\b", "gi");
+  // Only touch text between tags.
+  return html.replace(/(^|>)([^<]+)/g, (_, a, txt) => a + txt.replace(re, "<mark>$1</mark>"));
+}
+
+function inline(s, ts) {
+  return s.split(/(`[^`]+`)/g).map((part) =>
+    part.startsWith("`") && part.endsWith("`") && part.length > 1
+      ? "<code>" + esc(part.slice(1, -1)) + "</code>"
+      : highlight(esc(part).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"), ts)
+  ).join("");
+}
+
+function renderMarkdown(text, ts) {
+  const out = []; let para = []; let code = null;
+  const flush = () => { if (para.length) { out.push("<p>" + para.map((l) => inline(l, ts)).join("<br>") + "</p>"); para = []; } };
+  for (const line of text.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      if (code === null) { flush(); code = []; } else { out.push("<pre><code>" + esc(code.join("\n")) + "</code></pre>"); code = null; }
+      continue;
+    }
+    if (code !== null) { code.push(line); continue; }
+    if (!line.trim()) { flush(); continue; }
+    const h = line.match(/^#{1,6}\s+(.*)/);
+    if (h) { flush(); out.push("<h4>" + inline(h[1], ts) + "</h4>"); continue; }
+    para.push(line);
+  }
+  if (code !== null) out.push("<pre><code>" + esc(code.join("\n")) + "</code></pre>");
+  flush();
+  return out.join("");
+}
+
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1600); }
+async function copy(text, msg = "Copied") { await navigator.clipboard.writeText(text); toast(msg); }
+const api = (p, opts) => fetch(p, opts).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+function card(r, n, ts) {
+  const crumb = r.headings.length ? r.headings.map((h, i) => i === r.headings.length - 1 ? `<b>${esc(h)}</b>` : esc(h)).join(" › ") : esc(r.title);
+  const pct = Math.max(4, Math.min(100, ((r.score - 0.4) / 0.5) * 100));
+  const el = document.createElement("article");
+  el.className = "card"; el.style.animationDelay = n * 30 + "ms";
+  el.innerHTML = `
+    <div class="card-head">
+      <span class="rank">${n}</span>
+      <span class="loc">${esc(r.rel_path)}<span>:${r.start_line}–${r.end_line}</span></span>
+      ${r.keyword ? '<span class="tag">keyword</span>' : ""}
+      <span class="score"><span class="bar"><i style="width:${pct}%"></i></span>${r.score.toFixed(2)}</span>
+    </div>
+    <div class="crumb">${crumb}</div>
+    <div class="body clamp">${renderMarkdown(r.text, ts)}</div>
+    <div class="card-foot">
+      <button class="link" data-act="more">Show more</button>
+      <button class="link" data-act="ctx">Expand context</button>
+      <button class="link" data-act="open">Open file</button>
+      <button class="link" data-act="copy">Copy chunk</button>
+    </div>`;
+  const body = el.querySelector(".body");
+  el.querySelector('[data-act="more"]').onclick = (e) => { body.classList.toggle("clamp"); e.target.textContent = body.classList.contains("clamp") ? "Show more" : "Show less"; };
+  el.querySelector('[data-act="ctx"]').onclick = async (e) => {
+    const c = await api(`/api/chunk/${r.id}?neighbors=1`);
+    body.innerHTML = renderMarkdown(c.text, ts); body.classList.remove("clamp");
+    el.querySelector(".loc").innerHTML = `${esc(r.rel_path)}<span>:${c.start_line}–${c.end_line}</span>`;
+    e.target.remove(); el.querySelector('[data-act="more"]').textContent = "Show less";
+  };
+  el.querySelector('[data-act="open"]').onclick = () => openFile(r);
+  el.querySelector('[data-act="copy"]').onclick = () => copy(`${r.rel_path}:${r.start_line}-${r.end_line}\n\n${r.text}`, "Chunk copied");
+  return el;
+}
+
+async function search(q) {
+  q = q.trim();
+  const params = new URLSearchParams({ q, k: $("k").value });
+  if ($("scope").value) params.set("path", $("scope").value);
+  if ($("all").checked) params.set("all", "true");
+  history.replaceState(null, "", q ? "?q=" + encodeURIComponent(q) : location.pathname);
+  if (!q) return showEmpty();
+  $("hero").classList.add("compact");
+  $("meta").innerHTML = '<span class="spin"></span>&nbsp; Searching…';
+  const t0 = performance.now();
+  const data = await api("/api/search?" + params);
+  last = data;
+  const ms = Math.round(performance.now() - t0);
+  const res = $("results"); res.innerHTML = "";
+  $("copy-all").hidden = !data.results.length;
+  if (!data.results.length) {
+    $("meta").textContent = "";
+    res.innerHTML = `<div class="empty"><div class="big">∅</div>Nothing relevant enough for “${esc(q)}”.<br><small>Try different words, or tick “weaker matches”.</small></div>`;
+    return;
+  }
+  const files = new Set(data.results.map((r) => r.path)).size;
+  const words = data.results.reduce((a, r) => a + r.text.split(/\s+/).length, 0);
+  $("meta").textContent = `${data.results.length} chunks from ${files} file${files > 1 ? "s" : ""} · ~${Math.round(words * 1.3)} tokens · ${ms} ms`;
+  const ts = terms(q);
+  data.results.forEach((r, i) => res.appendChild(card(r, i + 1, ts)));
+}
+
+function showEmpty() {
+  $("hero").classList.remove("compact"); $("meta").textContent = ""; $("copy-all").hidden = true;
+  $("results").innerHTML = `<div class="empty">Try a question:<div class="chips" id="chips"></div></div>`;
+  ["how do I roll back a deploy?", "why does the client loop on token_expired?", "what are the rate limits?", "commit message format"]
+    .forEach((s) => { const b = document.createElement("button"); b.className = "chip"; b.textContent = s; b.onclick = () => { $("q").value = s; search(s); }; $("chips").appendChild(b); });
+}
+
+async function openFile(r) {
+  const f = await api("/api/file?path=" + encodeURIComponent(r.path));
+  $("drawer-title").innerHTML = `${esc(r.rel_path)}<span>:${r.start_line}–${r.end_line}</span>`;
+  $("drawer-copy").onclick = () => copy(r.path, "Path copied");
+  const code = $("drawer-code"); code.innerHTML = "";
+  f.text.split("\n").forEach((l, i) => {
+    const n = i + 1, d = document.createElement("div");
+    d.className = "ln" + (n >= r.start_line && n <= r.end_line ? " hit" : "");
+    d.innerHTML = `<b>${n}</b>${esc(l) || " "}`; code.appendChild(d);
+  });
+  $("drawer").classList.add("open"); $("drawer-bg").classList.add("open");
+  setTimeout(() => code.children[Math.max(0, r.start_line - 4)]?.scrollIntoView({ block: "start" }), 60);
+}
+const closeDrawer = () => { $("drawer").classList.remove("open"); $("drawer-bg").classList.remove("open"); };
+
+async function loadStats() {
+  const [s, files] = await Promise.all([api("/api/status"), api("/api/files")]);
+  $("stat-files").textContent = `${s.files} files`;
+  $("stat-chunks").textContent = `${s.chunks} chunks · ${s.dim}d`;
+  const sel = $("scope"), cur = sel.value;
+  sel.innerHTML = '<option value="">All files</option>' + files.map((f) => `<option value="${esc(f.path)}">${esc(f.rel_path)}</option>`).join("");
+  sel.value = cur;
+}
+
+$("form").onsubmit = (e) => { e.preventDefault(); search($("q").value); };
+["scope", "k", "all"].forEach((id) => $(id).onchange = () => $("q").value.trim() && search($("q").value));
+$("copy-all").onclick = () => copy(last.markdown, "Context copied — paste into your chat");
+$("drawer-close").onclick = closeDrawer; $("drawer-bg").onclick = closeDrawer;
+$("reindex").onclick = async () => {
+  $("reindex").innerHTML = '<span class="spin"></span>';
+  try { const s = await api("/api/reindex", { method: "POST" }); toast(`Indexed: +${s.added} ~${s.updated} −${s.removed}`); await loadStats(); }
+  catch { toast("Re-index failed"); } finally { $("reindex").textContent = "↻"; }
+};
+$("theme").onclick = () => {
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const cur = document.documentElement.dataset.theme || (dark ? "dark" : "light");
+  const next = cur === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("rag-theme", next); } catch {}
+};
+try { const t = localStorage.getItem("rag-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.activeElement !== $("q")) { e.preventDefault(); $("q").focus(); $("q").select(); }
+  if (e.key === "Escape") closeDrawer();
+});
+
+loadStats();
+const initial = new URLSearchParams(location.search).get("q");
+if (initial) { $("q").value = initial; search(initial); } else showEmpty();
+</script>
+</body>
+</html>

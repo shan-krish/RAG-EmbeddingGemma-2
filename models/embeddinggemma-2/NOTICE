@@ -1,0 +1,6 @@
+This directory contains a modified copy of google/embeddinggemma-2
+(https://huggingface.co/google/embeddinggemma-2), licensed under the Apache License 2.0.
+
+Changes: exported with sentence-transformers as a text-only model (vision and audio encoders
+removed via vision_config=None, audio_config=None) and weights cast to bfloat16.
+README.md is the original model card.

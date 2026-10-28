@@ -1,0 +1,32 @@
+{
+  "__version__": {
+    "pytorch": "2.14.1",
+    "sentence_transformers": "6.2.0",
+    "transformers": "5.21.0"
+  },
+  "default_prompt_name": null,
+  "model_type": "SentenceTransformer",
+  "prompts": {
+    "BitextMining": "task: search result | query: ",
+    "Classification": "task: classification | query: ",
+    "Clustering": "task: clustering | query: ",
+    "CodeRetrieval": "task: code retrieval | query: ",
+    "Document": "title: none | text: ",
+    "FactChecking": "task: fact checking | query: ",
+    "InstructionRetrieval": "task: code retrieval | query: ",
+    "MultilabelClassification": "task: classification | query: ",
+    "PairClassification": "task: sentence similarity | query: ",
+    "QuestionAnswering": "task: question answering | query: ",
+    "Reranking": "task: search result | query: ",
+    "Retrieval": "task: search result | query: ",
+    "Retrieval-document": "title: none | text: ",
+    "Retrieval-query": "task: search result | query: ",
+    "STS": "task: sentence similarity | query: ",
+    "SearchQuery": "task: search result | query: ",
+    "SentenceSimilarity": "task: sentence similarity | query: ",
+    "Summarization": "task: sentence similarity | query: ",
+    "document": "title: none | text: ",
+    "query": "task: search result | query: "
+  },
+  "similarity_fn_name": "cosine"
+}
