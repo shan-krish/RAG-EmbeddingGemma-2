@@ -38,6 +38,7 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .brand small { color: var(--faint); font-weight: 500; }
 .stats { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
 .pill { border: 1px solid var(--border); background: var(--surface); padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.pill:empty { display: none; }
 .icon-btn { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 4px 9px; cursor: pointer; color: var(--muted); }
 .icon-btn:hover { color: var(--text); }
 
@@ -93,6 +94,8 @@ form.search { position: relative; }
 
 .empty { text-align: center; padding: 50px 10px; color: var(--muted); }
 .empty .big { font-size: 34px; margin-bottom: 6px; }
+.empty code { font: 13px var(--mono); background: var(--surface-2); border-radius: 5px; padding: 2px 7px; display: inline-block; margin: 6px 0; color: var(--text); }
+.empty a { color: var(--accent); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
 .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 5px 12px; cursor: pointer; font-size: 13px; }
 .chip:hover { border-color: var(--accent); color: var(--accent); }
@@ -215,7 +218,28 @@ function renderMarkdown(text, ts) {
 
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1600); }
 async function copy(text, msg = "Copied") { await navigator.clipboard.writeText(text); toast(msg); }
-const api = (p, opts) => fetch(p, opts).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+const SERVED = location.protocol === "http:" || location.protocol === "https:";
+const OFFLINE_HELP = `The search server isn't reachable. Start it from the repo folder:<br><code>./rag.sh ui</code><br>then open <a href="http://127.0.0.1:7860">http://127.0.0.1:7860</a>.`;
+
+async function api(p, opts = {}) {
+  if (!SERVED) throw Object.assign(new Error("not served"), { offline: true });
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 120000);
+  let r;
+  try { r = await fetch(p, { ...opts, signal: ctl.signal }); }
+  catch (e) { throw Object.assign(new Error(e.name === "AbortError" ? "timed out" : "unreachable"), { offline: e.name !== "AbortError" }); }
+  finally { clearTimeout(timer); }
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail || detail; } catch {}
+    throw new Error(`${r.status} ${detail}`);
+  }
+  return r.json();
+}
+
+function showError(e) {
+  $("meta").textContent = ""; $("copy-all").hidden = true;
+  $("results").innerHTML = `<div class="empty"><div class="big">⚠</div>${e.offline ? OFFLINE_HELP : "Search failed: " + esc(e.message)}</div>`;
+}
 
 function card(r, n, ts) {
   const crumb = r.headings.length ? r.headings.map((h, i) => i === r.headings.length - 1 ? `<b>${esc(h)}</b>` : esc(h)).join(" › ") : esc(r.title);
@@ -240,7 +264,8 @@ function card(r, n, ts) {
   const body = el.querySelector(".body");
   el.querySelector('[data-act="more"]').onclick = (e) => { body.classList.toggle("clamp"); e.target.textContent = body.classList.contains("clamp") ? "Show more" : "Show less"; };
   el.querySelector('[data-act="ctx"]').onclick = async (e) => {
-    const c = await api(`/api/chunk/${r.id}?neighbors=1`);
+    let c;
+    try { c = await api(`/api/chunk/${r.id}?neighbors=1`); } catch (err) { return toast("Couldn't expand: " + err.message); }
     body.innerHTML = renderMarkdown(c.text, ts); body.classList.remove("clamp");
     el.querySelector(".loc").innerHTML = `${esc(r.rel_path)}<span>:${c.start_line}–${c.end_line}</span>`;
     e.target.remove(); el.querySelector('[data-act="more"]').textContent = "Show less";
@@ -255,12 +280,16 @@ async function search(q) {
   const params = new URLSearchParams({ q, k: $("k").value });
   if ($("scope").value) params.set("path", $("scope").value);
   if ($("all").checked) params.set("all", "true");
-  history.replaceState(null, "", q ? "?q=" + encodeURIComponent(q) : location.pathname);
+  try { history.replaceState(null, "", q ? "?q=" + encodeURIComponent(q) : location.pathname); } catch {}
   if (!q) return showEmpty();
   $("hero").classList.add("compact");
   $("meta").innerHTML = '<span class="spin"></span>&nbsp; Searching…';
+  const slow = setTimeout(() => { $("meta").innerHTML = '<span class="spin"></span>&nbsp; Searching… (the first search loads the model, ~10 s)'; }, 2500);
   const t0 = performance.now();
-  const data = await api("/api/search?" + params);
+  let data;
+  try { data = await api("/api/search?" + params); }
+  catch (e) { return showError(e); }
+  finally { clearTimeout(slow); }
   last = data;
   const ms = Math.round(performance.now() - t0);
   const res = $("results"); res.innerHTML = "";
@@ -285,7 +314,8 @@ function showEmpty() {
 }
 
 async function openFile(r) {
-  const f = await api("/api/file?path=" + encodeURIComponent(r.path));
+  let f;
+  try { f = await api("/api/file?path=" + encodeURIComponent(r.path)); } catch (e) { return toast("Couldn't open file: " + e.message); }
   $("drawer-title").innerHTML = `${esc(r.rel_path)}<span>:${r.start_line}–${r.end_line}</span>`;
   $("drawer-copy").onclick = () => copy(r.path, "Path copied");
   const code = $("drawer-code"); code.innerHTML = "";
@@ -300,7 +330,9 @@ async function openFile(r) {
 const closeDrawer = () => { $("drawer").classList.remove("open"); $("drawer-bg").classList.remove("open"); };
 
 async function loadStats() {
-  const [s, files] = await Promise.all([api("/api/status"), api("/api/files")]);
+  let s, files;
+  try { [s, files] = await Promise.all([api("/api/status"), api("/api/files")]); }
+  catch (e) { $("stat-files").textContent = "server offline"; $("stat-chunks").textContent = ""; if (e.offline) showError(e); return; }
   $("stat-files").textContent = `${s.files} files`;
   $("stat-chunks").textContent = `${s.chunks} chunks · ${s.dim}d`;
   const sel = $("scope"), cur = sel.value;

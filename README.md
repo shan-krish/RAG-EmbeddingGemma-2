@@ -75,6 +75,9 @@ it falls back to downloading `google/embeddinggemma-2` from Hugging Face.
 ./rag.sh ui            # http://127.0.0.1:7860
 ```
 
+> Open the UI through `./rag.sh ui`, not by double-clicking `rag/web/static/index.html`. The page needs
+> the Python server behind it to search; opened as a plain file, it shows a "server isn't reachable" notice.
+
 The UI has a search box, result cards with highlighted terms, a score and `file:lines` on each hit, and a
 file filter. You can expand a hit to its neighbouring chunks, open the whole file in a side panel with the
 matched lines highlighted, and use **Copy as context** to get Markdown you can paste into any chat.
